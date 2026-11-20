@@ -391,14 +391,14 @@ extension Home {
                     NavigationStack { History.RootView(resolver: resolver) }
                         .tabItem { Label("", systemImage: historySFSymbol).accessibilityLabel(Text("History")) }.tag(1)
 
+                    // Personal build: a real tab item, so the + sits inside the
+                    // tab bar wherever iOS puts it (bottom, or the side strip on iPhone Duo).
+                    // Selecting it opens the treatment sheet; the selection is swallowed below.
                     Spacer()
-                        // nbsp title + empty image: invisible item that still
-                        // holds a full-width slot for the overlaid button
-                        .tabItem { Label {
-                            Text(String(repeating: "\u{00A0}", count: 12))
-                        } icon: {
-                            Image(uiImage: UIImage())
-                        } }
+                        .tabItem {
+                            Label("", systemImage: "plus.circle.fill")
+                                .accessibilityLabel(Text("Add Treatment"))
+                        }
                         .tag(RootView.treatmentTabTag)
 
                     NavigationStack { Adjustments.RootView(resolver: resolver) }
@@ -418,13 +418,6 @@ extension Home {
                 }
                 .tint(Color.tabBar)
 
-                // fixed distance from the physical screen bottom; immune to
-                // safe-area changes (keyboard, accessories)
-                GeometryReader { geo in
-                    treatmentButton
-                        .position(x: geo.size.width / 2, y: geo.size.height - 52)
-                }
-                .ignoresSafeArea(.all, edges: .bottom)
             }
             .ignoresSafeArea(.container, edges: .bottom)
             .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -445,6 +438,7 @@ extension Home {
                         selectedTab = newValue
                         DispatchQueue.main.async {
                             selectedTab = previous
+                            state.showModal(for: .treatmentView)
                         }
                     } else {
                         selectedTab = newValue
