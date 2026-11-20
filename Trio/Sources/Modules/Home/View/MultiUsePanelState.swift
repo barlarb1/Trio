@@ -22,7 +22,8 @@ enum MultiUsePanelState: Equatable {
         dosingMode: DosingMode,
         now: Date
     ) -> MultiUsePanelState {
-        if notificationsDisabled { return .notificationsDisabled }
+        // Personal build (MDI): notifications are off on purpose, so don't let that hide Time in Range.
+        _ = notificationsDisabled
         if pumpTimeMismatch { return .pumpTimeMismatch }
         if now.timeIntervalSince(lastGlucoseDate ?? .distantPast) > cgmStaleAfter { return .cgmStale }
         // constrained modes clamp Max IOB to 0 without touching the stored value
