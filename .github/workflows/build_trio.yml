@@ -266,7 +266,8 @@ jobs:
 
       # Install project dependencies
       - name: Install Project Dependencies
-        run: bundle install
+        # fastlane 2.241.2+ copes with Xcode 27.2's harmless altool upload warning
+        run: bundle update fastlane
 
       # Sync the GitHub runner clock with the Windows time server (workaround as suggested in https://github.com/actions/runner/issues/2996)
       - name: Sync clock
