@@ -123,14 +123,68 @@ platform :ios do
       targets: ["LiveActivityExtension"]
     )
 
-    gym(
-      export_method: "app-store",
-      scheme: "Trio",
-      output_name: "Trio.ipa",
-      configuration: "Release",
-      destination: 'generic/platform=iOS',
-      buildlog_path: 'buildlog'
-    )
+    la26_zip = ENV["LA26_ZIP"].to_s
+    if !la26_zip.empty? && File.exist?(la26_zip)
+      # Personal build: archive with Xcode 27, swap in the Live Activity built with the
+      # iOS 26 SDK (avoids the iOS 27 narrow Dynamic Island sizing bug), then export.
+      archive_path = "#{GITHUB_WORKSPACE}/Trio.xcarchive"
+      gym(
+        scheme: "Trio",
+        configuration: "Release",
+        destination: 'generic/platform=iOS',
+        buildlog_path: 'buildlog',
+        archive_path: archive_path,
+        skip_package_ipa: true
+      )
+
+      sh(<<~SWAP)
+        set -euo pipefail
+        APP=$(ls -d "#{archive_path}"/Products/Applications/*.app | head -1)
+        OLD="$APP/PlugIns/LiveActivityExtension.appex"
+        test -d "$OLD"
+        TMP=$(mktemp -d)
+        ditto -x -k "#{la26_zip}" "$TMP"
+        NEW="$TMP/LiveActivityExtension.appex"
+        test -d "$NEW"
+        for KEY in CFBundleIdentifier CFBundleVersion CFBundleShortVersionString; do
+          VAL=$(/usr/libexec/PlistBuddy -c "Print :$KEY" "$OLD/Info.plist")
+          /usr/libexec/PlistBuddy -c "Set :$KEY $VAL" "$NEW/Info.plist" || /usr/libexec/PlistBuddy -c "Add :$KEY string $VAL" "$NEW/Info.plist"
+        done
+        codesign -d --entitlements :"$TMP/entitlements.plist" "$OLD" || true
+        IDENTITY=$(codesign -dvv "$OLD" 2>&1 | sed -n 's/^Authority=//p' | head -1)
+        echo "Re-signing iOS 26 Live Activity with: $IDENTITY"
+        cp "$OLD/embedded.mobileprovision" "$NEW/" 2>/dev/null || true
+        rm -rf "$OLD"
+        cp -R "$NEW" "$OLD"
+        if [ -s "$TMP/entitlements.plist" ]; then
+          codesign -f -s "$IDENTITY" --entitlements "$TMP/entitlements.plist" "$OLD"
+        else
+          codesign -f -s "$IDENTITY" "$OLD"
+        fi
+        codesign -f -s "$IDENTITY" --preserve-metadata=identifier,entitlements,requirements "$APP"
+        codesign --verify --deep --strict "$APP" || echo "warning: verify reported an issue; export re-signs anyway"
+        echo "Swapped in Live Activity built with: $(/usr/libexec/PlistBuddy -c 'Print :DTSDKName' "$OLD/Info.plist")"
+      SWAP
+
+      gym(
+        scheme: "Trio",
+        configuration: "Release",
+        export_method: "app-store",
+        output_name: "Trio.ipa",
+        buildlog_path: 'buildlog',
+        archive_path: archive_path,
+        skip_build_archive: true
+      )
+    else
+      gym(
+        export_method: "app-store",
+        scheme: "Trio",
+        output_name: "Trio.ipa",
+        configuration: "Release",
+        destination: 'generic/platform=iOS',
+        buildlog_path: 'buildlog'
+      )
+    end
 
     copy_artifacts(
       target_path: "artifacts",
