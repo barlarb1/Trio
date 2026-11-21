@@ -186,9 +186,51 @@ jobs:
           (vars.SCHEDULED_SYNC != 'false' && needs.check_status.outputs.NEW_COMMITS == 'true' )
 
   # Builds Trio
+  # Personal build: build only the Live Activity widget with Xcode 26.5 (iOS 26 SDK).
+  # iOS 27 (27.0-27.2) sizes the Dynamic Island wrongly for widgets built with the
+  # iOS 27 SDK when the island is narrow (iPhone Duo side island, landscape) - FB25301955.
+  # The main build swaps this .appex into the app before signing.
+  build_live_activity_ios26:
+    name: Build Live Activity (iOS 26 SDK)
+    needs: [check_certs, check_status]
+    runs-on: macos-26
+    if:
+      | # same conditions as the main build
+      github.event_name == 'workflow_dispatch' ||
+        (vars.SCHEDULED_BUILD != 'false' && needs.check_status.outputs.IS_SECOND_IN_MONTH == 'true') ||
+        (vars.SCHEDULED_SYNC != 'false' && needs.check_status.outputs.NEW_COMMITS == 'true' )
+    steps:
+      - name: Select Xcode version
+        run: "sudo xcode-select --switch /Applications/Xcode_26.5.app/Contents/Developer"
+
+      - name: Checkout Repo for building
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+          submodules: recursive
+          ref: ${{ env.TARGET_BRANCH }}
+
+      - name: Build LiveActivityExtension (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild -project Trio.xcodeproj -target LiveActivityExtension \
+            -configuration Release -sdk iphoneos \
+            SYMROOT="$PWD/la26" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tail -n 40
+          APPEX=$(find la26 -name "LiveActivityExtension.appex" -type d | head -1)
+          test -n "$APPEX"
+          ditto -c -k --keepParent "$APPEX" LiveActivityExtension-ios26.zip
+
+      - name: Upload Live Activity appex
+        uses: actions/upload-artifact@v6
+        with:
+          name: live-activity-ios26
+          path: LiveActivityExtension-ios26.zip
+          retention-days: 3
+
   build:
     name: Build
-    needs: [check_certs, check_status]
+    needs: [check_certs, check_status, build_live_activity_ios26]
     # iOS 27.1+ SDK needed so the app fills the iPhone Duo's inner screen
     runs-on: xcode-27
     permissions:
@@ -269,6 +311,13 @@ jobs:
         # fastlane 2.241.2+ copes with Xcode 27.2's harmless altool upload warning
         run: bundle update fastlane
 
+      # Personal build: fetch the Live Activity built with the iOS 26 SDK
+      - name: Download Live Activity appex (iOS 26 SDK)
+        uses: actions/download-artifact@v6
+        with:
+          name: live-activity-ios26
+          path: la26
+
       # Sync the GitHub runner clock with the Windows time server (workaround as suggested in https://github.com/actions/runner/issues/2996)
       - name: Sync clock
         run: sudo sntp -sS time.windows.com
@@ -277,6 +326,7 @@ jobs:
       - name: Fastlane Build & Archive
         run: bundle exec fastlane build_trio
         env:
+          LA26_ZIP: ${{ github.workspace }}/la26/LiveActivityExtension-ios26.zip
           TEAMID: ${{ secrets.TEAMID }}
           GH_PAT: ${{ secrets.GH_PAT }}
           FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}
