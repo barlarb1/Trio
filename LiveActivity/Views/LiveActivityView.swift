@@ -225,40 +225,7 @@ struct LiveActivityCompactLeadingView: View {
     var glucoseColor: Color
 
     var body: some View {
-        if #available(iOS 27.0, *) {
-            NarrowAwareCompactLeadingView(context: context, glucoseColor: glucoseColor)
-        } else {
-            LiveActivityBGAndTrendView(context: context, size: .compact, glucoseColor: glucoseColor).padding(.leading, 4)
-        }
-    }
-}
-
-/// Personal build: on the iPhone Duo (side island) and in landscape the island has no
-/// room to grow, so show just the glucose number, squeezed to fit, instead of number + arrow.
-@available(iOS 27.0, *) struct NarrowAwareCompactLeadingView: View {
-    @Environment(\.isDynamicIslandLimitedInWidth) private var isLimitedInWidth
-    var context: ActivityViewContext<LiveActivityAttributes>
-    var glucoseColor: Color
-
-    var body: some View {
-        if isLimitedInWidth {
-            // Side island: number and arrow together on one line, centred, shrunk to fit.
-            HStack(spacing: 1) {
-                Text(context.state.bg)
-                    .strikethrough(context.isStale, pattern: .solid, color: .red.opacity(0.6))
-                if let first = context.state.direction?.first {
-                    Text(String(first))
-                }
-            }
-            .fontWeight(.semibold)
-            .fontWidth(.compressed)
-            .lineLimit(1)
-            .minimumScaleFactor(0.4)
-            .foregroundStyle(glucoseColor)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        } else {
-            LiveActivityBGAndTrendView(context: context, size: .compact, glucoseColor: glucoseColor).padding(.leading, 4)
-        }
+        LiveActivityBGAndTrendView(context: context, size: .compact, glucoseColor: glucoseColor).padding(.leading, 4)
     }
 }
 
@@ -267,28 +234,7 @@ struct LiveActivityCompactTrailingView: View {
     var glucoseColor: Color
 
     var body: some View {
-        if #available(iOS 27.0, *) {
-            NarrowAwareCompactTrailingView(context: context, glucoseColor: glucoseColor)
-        } else {
-            LiveActivityGlucoseDeltaLabelView(context: context, glucoseColor: glucoseColor).padding(.trailing, 4)
-        }
-    }
-}
-
-/// Personal build: when the island is limited in width, show the trend arrow
-/// (one character) instead of the delta, which gets cut off ("+...").
-@available(iOS 27.0, *) struct NarrowAwareCompactTrailingView: View {
-    @Environment(\.isDynamicIslandLimitedInWidth) private var isLimitedInWidth
-    var context: ActivityViewContext<LiveActivityAttributes>
-    var glucoseColor: Color
-
-    var body: some View {
-        if isLimitedInWidth {
-            // Side island: everything is shown in the leading slot, so keep this one empty.
-            EmptyView()
-        } else {
-            LiveActivityGlucoseDeltaLabelView(context: context, glucoseColor: glucoseColor).padding(.trailing, 4)
-        }
+        LiveActivityGlucoseDeltaLabelView(context: context, glucoseColor: glucoseColor).padding(.trailing, 4)
     }
 }
 
