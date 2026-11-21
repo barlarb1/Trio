@@ -242,13 +242,20 @@ struct LiveActivityCompactLeadingView: View {
 
     var body: some View {
         if isLimitedInWidth {
-            Text(context.state.bg)
-                .fontWeight(.semibold)
-                .fontWidth(.compressed)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .foregroundStyle(glucoseColor)
-                .strikethrough(context.isStale, pattern: .solid, color: .red.opacity(0.6))
+            // Side island: number and arrow together on one line, centred, shrunk to fit.
+            HStack(spacing: 1) {
+                Text(context.state.bg)
+                    .strikethrough(context.isStale, pattern: .solid, color: .red.opacity(0.6))
+                if let first = context.state.direction?.first {
+                    Text(String(first))
+                }
+            }
+            .fontWeight(.semibold)
+            .fontWidth(.compressed)
+            .lineLimit(1)
+            .minimumScaleFactor(0.4)
+            .foregroundStyle(glucoseColor)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
             LiveActivityBGAndTrendView(context: context, size: .compact, glucoseColor: glucoseColor).padding(.leading, 4)
         }
@@ -277,17 +284,8 @@ struct LiveActivityCompactTrailingView: View {
 
     var body: some View {
         if isLimitedInWidth {
-            if let direction = context.state.direction, let first = direction.first {
-                Text(String(first))
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .foregroundStyle(glucoseColor)
-            } else {
-                LiveActivityGlucoseDeltaLabelView(context: context, glucoseColor: glucoseColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-            }
+            // Side island: everything is shown in the leading slot, so keep this one empty.
+            EmptyView()
         } else {
             LiveActivityGlucoseDeltaLabelView(context: context, glucoseColor: glucoseColor).padding(.trailing, 4)
         }
